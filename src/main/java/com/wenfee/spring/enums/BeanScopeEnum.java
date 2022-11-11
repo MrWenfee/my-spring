@@ -1,4 +1,4 @@
-package com.wenfee.spring;
+package com.wenfee.spring.enums;
 
 /**
  * @author Wenfee

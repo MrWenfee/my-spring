@@ -1,6 +1,6 @@
 package com.wenfee.spring.context;
 
-import com.wenfee.spring.BeanScopeEnum;
+import com.wenfee.spring.enums.BeanScopeEnum;
 import com.wenfee.spring.annotation.Component;
 import com.wenfee.spring.annotation.ComponentScan;
 import com.wenfee.spring.annotation.Lazy;
