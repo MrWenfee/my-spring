@@ -8,4 +8,6 @@ package com.wenfee.spring.service;
 public interface IUserService {
 
     void test();
+
+    void testAutowired();
 }

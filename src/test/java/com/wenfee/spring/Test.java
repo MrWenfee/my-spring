@@ -22,7 +22,12 @@ public class Test {
         // IUserService 作用域是：原型
         IUserService userService = (UserServiceImpl) applicationContext.getBean("userService");
         IUserService userService2 = (UserServiceImpl) applicationContext.getBean("userService");
+        // 依赖
         userService.test();
         userService2.test();
+
+        // 属性注入
+        userService.testAutowired();
+        userService2.testAutowired();
     }
 }

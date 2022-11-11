@@ -1,13 +1,11 @@
 package com.wenfee.spring.context;
 
+import com.wenfee.spring.annotation.*;
 import com.wenfee.spring.enums.BeanScopeEnum;
-import com.wenfee.spring.annotation.Component;
-import com.wenfee.spring.annotation.ComponentScan;
-import com.wenfee.spring.annotation.Lazy;
-import com.wenfee.spring.annotation.Scope;
 import com.wenfee.spring.framework.BeanDefinition;
 
 import java.io.File;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.util.HashMap;
@@ -154,6 +152,16 @@ public class ApplicationContext {
         try {
             // 通过无参构造，生成一个实例;
             o = beanClass.getDeclaredConstructor().newInstance();
+
+            // 依赖注入- 属性
+            for (Field declaredField : beanClass.getDeclaredFields()) {
+                if (declaredField.isAnnotationPresent(Autowired.class)) {
+                    // by beanName
+                    Object bean = getBean(declaredField.getName());
+                    declaredField.setAccessible(true);
+                    declaredField.set(o, bean);
+                }
+            }
         } catch (InstantiationException e) {
             e.printStackTrace();
         } catch (IllegalAccessException e) {
