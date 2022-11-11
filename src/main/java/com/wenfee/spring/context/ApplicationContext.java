@@ -3,6 +3,7 @@ package com.wenfee.spring.context;
 import com.wenfee.spring.annotation.*;
 import com.wenfee.spring.enums.BeanScopeEnum;
 import com.wenfee.spring.framework.BeanDefinition;
+import com.wenfee.spring.framework.BeanNameAware;
 
 import java.io.File;
 import java.lang.reflect.Field;
@@ -43,19 +44,29 @@ public class ApplicationContext {
 
         scan(configClass, beanDefinitionMap);
 
-        //创建非懒加载的单例bean
+        // 创建非懒加载的单例bean
         createNonLazySingleton(beanDefinitionMap);
     }
 
     private void createNonLazySingleton(Map<String, BeanDefinition> beanDefinitionMap) {
         for (String beanName : beanDefinitionMap.keySet()) {
             BeanDefinition beanDefinition = beanDefinitionMap.get(beanName);
-            if(Objects.equals(beanDefinition.getScope(), BeanScopeEnum.SINGLETON.getScope()) && !beanDefinition.isLazy()) {
-                //创建bean
-                Object valueBean = createBean(beanDefinition);
-                singletonObj.put(beanName,valueBean);
+            if (Objects.equals(beanDefinition.getScope(), BeanScopeEnum.SINGLETON.getScope()) && !beanDefinition.isLazy()) {
+                // 创建bean
+                Object valueBean = createBean(beanDefinition, beanName);
+                singletonObj.put(beanName, valueBean);
             }
         }
+
+        beanDefinitionMap.keySet()
+                .stream()
+                .filter(Objects::nonNull)
+                .forEach((k) -> {
+                    BeanDefinition beanDefinition = beanDefinitionMap.get(k);
+                    if (!Objects.isNull(beanDefinition)) {
+                        attributeInjection(k, beanDefinition);
+                    }
+                });
     }
 
     private static void scan(Class configClass, Map<String, BeanDefinition> beanDefinitionMap) {
@@ -103,6 +114,11 @@ public class ApplicationContext {
                             String beanName = componentAnnotation.value();
                             System.out.println("Component 注解的值: " + beanName);
 
+                            if (Objects.isNull(beanName) || beanName.equals("")) {
+                                beanName = handBeanName(aClass);
+                                System.out.println("Component 未配置值，使用: " + beanName);
+                            }
+
                             // 懒加载
                             if (aClass.isAnnotationPresent(Lazy.class)) {
                                 beanDefinition.setLazy(true);
@@ -126,6 +142,29 @@ public class ApplicationContext {
         }
     }
 
+    public static String handBeanName(Class aClass) {
+        String aClassName = aClass.getName();
+        String beanName = aClassName.substring(aClassName.lastIndexOf('.') + 1);
+        return beanName;
+    }
+
+    /**
+     * 通过类型获取 Bean
+     *
+     * @param aClass
+     * @return
+     */
+    public Object getBean(Class aClass) {
+        String beanName = handBeanName(aClass);
+        return getBean(beanName);
+    }
+
+    /**
+     * 通过指定 beanName 获取 Bean
+     *
+     * @param beanName
+     * @return
+     */
     public Object getBean(String beanName) {
         Object o = null;
         if (!beanDefinitionMap.containsKey(beanName)) {
@@ -137,7 +176,7 @@ public class ApplicationContext {
         if (Objects.equals(beanDefinition.getScope(), BeanScopeEnum.PROTOTYPE.getScope())) {
             // 原型
             System.out.println("原型：new一个对象");
-            o = createBean(beanDefinition);
+            o = createBean(beanDefinition, beanName);
 
         } else if (Objects.equals(beanDefinition.getScope(), BeanScopeEnum.SINGLETON.getScope())) {
             // 单例
@@ -146,7 +185,58 @@ public class ApplicationContext {
         return o;
     }
 
-    private Object createBean(BeanDefinition beanDefinition) {
+    /**
+     * 单例- 属性注入
+     *
+     * @param beanName
+     * @param beanDefinition
+     */
+    private void attributeInjection(String beanName, BeanDefinition beanDefinition) {
+        if (!Objects.equals(beanDefinition.getScope(), BeanScopeEnum.SINGLETON.getScope())) {
+            return;
+        }
+        Object o = singletonObj.get(beanName);
+        Class aClass = o.getClass();
+        for (Field declaredField : aClass.getDeclaredFields()) {
+            if (declaredField.isAnnotationPresent(Autowired.class)) {
+                // by beanName
+                Object bean = getBean(declaredField.getName());
+                declaredField.setAccessible(true);
+                try {
+                    declaredField.set(o, bean);
+                } catch (IllegalAccessException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+    }
+
+    /**
+     * 原型- 属性注入
+     *
+     * @param beanDefinition
+     * @param o
+     */
+    private void attributeInjection(BeanDefinition beanDefinition, Object o) {
+        if (Objects.equals(beanDefinition.getScope(), BeanScopeEnum.SINGLETON.getScope())) {
+            return;
+        }
+        Class beanClass = beanDefinition.getBeanClass();
+        for (Field declaredField : beanClass.getDeclaredFields()) {
+            if (declaredField.isAnnotationPresent(Autowired.class)) {
+                // by beanName
+                Object bean = getBean(declaredField.getName());
+                declaredField.setAccessible(true);
+                try {
+                    declaredField.set(o, bean);
+                } catch (IllegalAccessException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+    }
+
+    private Object createBean(BeanDefinition beanDefinition, String beanName) {
         Class beanClass = beanDefinition.getBeanClass();
         Object o = null;
         try {
@@ -154,13 +244,10 @@ public class ApplicationContext {
             o = beanClass.getDeclaredConstructor().newInstance();
 
             // 依赖注入- 属性
-            for (Field declaredField : beanClass.getDeclaredFields()) {
-                if (declaredField.isAnnotationPresent(Autowired.class)) {
-                    // by beanName
-                    Object bean = getBean(declaredField.getName());
-                    declaredField.setAccessible(true);
-                    declaredField.set(o, bean);
-                }
+            attributeInjection(beanDefinition, o);
+
+            if (o instanceof BeanNameAware) {
+                ((BeanNameAware) o).setBeanName(beanName);
             }
         } catch (InstantiationException e) {
             e.printStackTrace();

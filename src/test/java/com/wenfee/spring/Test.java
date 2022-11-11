@@ -20,8 +20,8 @@ public class Test {
     public static void testIOC() {
         ApplicationContext applicationContext = new ApplicationContext(AppConfig.class);
         // IUserService 作用域是：原型
-        IUserService userService = (UserServiceImpl) applicationContext.getBean("userService");
-        IUserService userService2 = (UserServiceImpl) applicationContext.getBean("userService");
+        IUserService userService = (UserServiceImpl) applicationContext.getBean(UserServiceImpl.class);
+        IUserService userService2 = (UserServiceImpl) applicationContext.getBean("UserServiceImpl");
         // 依赖
         userService.test();
         userService2.test();
@@ -29,5 +29,9 @@ public class Test {
         // 属性注入
         userService.testAutowired();
         userService2.testAutowired();
+
+        // 类型
+        System.out.println(userService.getBeanName());
+        System.out.println(userService2.getBeanName());
     }
 }

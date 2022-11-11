@@ -10,4 +10,6 @@ public interface IUserService {
     void test();
 
     void testAutowired();
+
+    String getBeanName();
 }
